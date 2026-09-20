@@ -14,7 +14,7 @@ import websockets
 
 from file_hunter_agent import config
 from file_hunter_agent.services import scanner
-from file_hunter_agent.services import transcode
+from file_hunter_agent.services import rawconvert, transcode
 
 logger = logging.getLogger("file_hunter_agent")
 
@@ -49,6 +49,8 @@ async def run_client():
     scanner.set_send_fn(send_message)
     transcode.set_send_fn(send_message)
     transcode.detect_encoder()
+    rawconvert.set_send_fn(send_message)
+    rawconvert.detect()
 
     while True:
         try:
@@ -83,7 +85,8 @@ async def run_client():
                                 "stream_first_scan",
                                 "quick_scan",
                                 "files_copy",
-                            ] + (["ffmpeg"] if transcode.is_available() else []),
+                            ] + (["ffmpeg"] if transcode.is_available() else [])
+                              + (["dcraw"] if rawconvert.is_available() else []),
                             "ffmpegEncoder": transcode.get_encoder_info() if transcode.is_available() else None,
                         }
                     )

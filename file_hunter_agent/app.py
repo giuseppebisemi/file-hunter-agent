@@ -43,6 +43,7 @@ from file_hunter_agent.routes.scan import scan_start, scan_cancel
 from file_hunter_agent.routes.status import status
 from file_hunter_agent.routes.tree import tree
 from file_hunter_agent.routes.transcode import transcode_start, transcode_cancel
+from file_hunter_agent.routes.rawconvert import rawconvert_start
 from file_hunter_agent.routes.upload import upload
 
 logger = logging.getLogger(__name__)
@@ -127,6 +128,7 @@ def create_app():
             Route("/disk-stats", disk_stats, methods=["POST"]),
             Route("/transcode", transcode_start, methods=["POST"]),
             Route("/transcode/cancel", transcode_cancel, methods=["POST"]),
+            Route("/rawconvert", rawconvert_start, methods=["POST"]),
             Route("/status", status, methods=["GET"]),
         ],
     )

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "file-hunter-agent"
-version = "1.0.27"
+version = "1.0.28"
 description = "Remote agent for File Hunter — exposes filesystems to the central server"
 requires-python = ">=3.11"
 dependencies = [
