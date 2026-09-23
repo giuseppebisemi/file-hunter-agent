@@ -13,6 +13,7 @@ Phase 2 (hashing): streams H records for all files sorted by inode.
 TSV format (tabs in filenames converted to spaces):
     D\trel_dir\n
     F\trel_path\tsize\tmtime\tctime\tinode\n
+    W\trel_path\tmessage\n
     P\thashing\ttotal_files\n
     H\trel_path\thash_partial\n
     E\ttotal_dirs\ttotal_files\n
@@ -25,10 +26,8 @@ import stat
 import tempfile
 import time
 from collections import deque
-from datetime import datetime, timezone
-
 from file_hunter_core.hasher import hash_file_partial_sync
-from file_hunter_core.paths import safe_str, safe_path
+from file_hunter_core.paths import safe_str, safe_path, safe_timestamp, TIMESTAMP_INVALID
 
 logger = logging.getLogger("file_hunter_agent")
 
@@ -131,13 +130,11 @@ def _walk_and_hash(root, start, queue, spill_db, spill_batch, scope, t0, last_lo
 
             name = safe_str(entry.name)
             rel_path = f"{rel_dir}/{name}" if rel_dir else name
-            mtime = datetime.fromtimestamp(st.st_mtime, tz=timezone.utc).isoformat(
-                timespec="seconds"
-            )
-            ctime = datetime.fromtimestamp(
+            mtime = safe_timestamp(st.st_mtime, rel_path)
+            ctime = safe_timestamp(
                 st.st_birthtime if hasattr(st, "st_birthtime") else st.st_ctime,
-                tz=timezone.utc,
-            ).isoformat(timespec="seconds")
+                rel_path,
+            )
 
             ino = st.st_ino
             if ino >= 2**63:
@@ -145,6 +142,8 @@ def _walk_and_hash(root, start, queue, spill_db, spill_batch, scope, t0, last_lo
 
             safe_rel = rel_path.replace(chr(9), " ")
             line_buf.append(f"F\t{safe_rel}\t{st.st_size}\t{mtime}\t{ctime}\t{ino}\n")
+            if mtime == TIMESTAMP_INVALID or ctime == TIMESTAMP_INVALID:
+                line_buf.append(f"W\t{safe_rel}\tInvalid file timestamp\n")
             dir_file_count += 1
 
             if st.st_size > 0:

@@ -31,6 +31,7 @@ def _list_path(path):
                         "name": name,
                         "size": st.st_size,
                         "mtime": st.st_mtime,
+                        "ctime": st.st_birthtime if hasattr(st, "st_birthtime") else st.st_ctime,
                         "inode": st.st_ino,
                     })
             except (PermissionError, OSError):

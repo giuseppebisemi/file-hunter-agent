@@ -6,10 +6,9 @@ No database, no async. The caller handles DB upsert separately.
 
 import os
 import stat
-from datetime import datetime, timezone
 
 from file_hunter_core.classify import classify_file
-from file_hunter_core.paths import safe_str
+from file_hunter_core.paths import safe_str, safe_timestamp
 
 
 def scan_directory(dirpath: str, root_path: str, parent_hidden: bool = False):
@@ -57,13 +56,11 @@ def scan_directory(dirpath: str, root_path: str, parent_hidden: bool = False):
                 "rel_path": rel_path,
                 "rel_dir": rel_dir,
                 "file_size": st.st_size,
-                "created_date": datetime.fromtimestamp(
+                "created_date": safe_timestamp(
                     st.st_birthtime if hasattr(st, "st_birthtime") else st.st_ctime,
-                    tz=timezone.utc,
-                ).isoformat(timespec="seconds"),
-                "modified_date": datetime.fromtimestamp(
-                    st.st_mtime, tz=timezone.utc
-                ).isoformat(timespec="seconds"),
+                    rel_path,
+                ),
+                "modified_date": safe_timestamp(st.st_mtime, rel_path),
                 "file_type_high": type_high,
                 "file_type_low": type_low,
                 "hidden": 1 if hidden else 0,

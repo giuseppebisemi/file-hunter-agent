@@ -6,11 +6,10 @@ Synchronous. The agent endpoint wraps this in asyncio.to_thread().
 import logging
 import os
 import stat
-from datetime import datetime, timezone
 
 from file_hunter_core.classify import classify_file
 from file_hunter_core.hasher import hash_file_partial_sync
-from file_hunter_core.paths import safe_str
+from file_hunter_core.paths import safe_str, safe_timestamp
 
 logger = logging.getLogger("file_hunter_agent")
 
@@ -113,9 +112,7 @@ def reconcile_directory(
             continue
 
         full_path, name, st = disk_files[rel_path]
-        mtime = datetime.fromtimestamp(st.st_mtime, tz=timezone.utc).isoformat(
-            timespec="seconds"
-        )
+        mtime = safe_timestamp(st.st_mtime, rel_path)
 
         if st.st_size == exp.get("file_size") and mtime == exp.get("modified_date"):
             unchanged.append(rel_path)
@@ -243,13 +240,11 @@ def _build_file_info(
         "rel_path": rel_path,
         "rel_dir": rel_dir,
         "file_size": st.st_size,
-        "created_date": datetime.fromtimestamp(
+        "created_date": safe_timestamp(
             st.st_birthtime if hasattr(st, "st_birthtime") else st.st_ctime,
-            tz=timezone.utc,
-        ).isoformat(timespec="seconds"),
-        "modified_date": datetime.fromtimestamp(st.st_mtime, tz=timezone.utc).isoformat(
-            timespec="seconds"
+            rel_path,
         ),
+        "modified_date": safe_timestamp(st.st_mtime, rel_path),
         "file_type_high": type_high,
         "file_type_low": type_low,
         "hidden": 1 if hidden else 0,

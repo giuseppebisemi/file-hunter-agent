@@ -12,7 +12,9 @@ filename that leaves the process. Keep the raw path for actual file
 operations (open, stat, hash).
 """
 
+import logging
 import os
+from datetime import datetime, timezone
 
 
 def safe_str(s: str) -> str:
@@ -33,6 +35,28 @@ def safe_path(path: str) -> bytes:
     decoded back with os.fsdecode() for file operations.
     """
     return os.fsencode(path)
+
+
+logger = logging.getLogger("file_hunter_agent")
+
+_DATETIME_MIN_UTC = datetime.min.replace(tzinfo=timezone.utc)
+TIMESTAMP_INVALID = _DATETIME_MIN_UTC.isoformat(timespec="seconds")
+
+
+def safe_timestamp(ts: float, path: str = "") -> str:
+    """Convert a filesystem timestamp to an ISO 8601 string.
+
+    Returns TIMESTAMP_INVALID (0001-01-01T00:00:00+00:00) for timestamps
+    that fall outside Python's supported year range (1-9999).
+    Compare the result against TIMESTAMP_INVALID to detect clamped values.
+    """
+    try:
+        return datetime.fromtimestamp(ts, tz=timezone.utc).isoformat(
+            timespec="seconds"
+        )
+    except (ValueError, OverflowError, OSError):
+        logger.warning("Invalid timestamp %.0f on %s — using datetime.min", ts, path)
+        return TIMESTAMP_INVALID
 
 
 def norm_inode(ino: int) -> int:
