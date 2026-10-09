@@ -3,20 +3,37 @@
 All functions are synchronous. The server wraps these in asyncio.to_thread().
 """
 
+import errno
 import hashlib
 import os
+import stat
 
 import xxhash
 
 CHUNK_SIZE = 1024 * 1024  # 1 MB
 PARTIAL_SIZE = 64 * 1024  # 64 KB
 
+# macOS marks online-only files (Dropbox, iCloud Drive, OneDrive, Google Drive)
+# as dataless. Reading one makes the File Provider download it, so hashing a
+# folder of them turns into a full cloud download.
+SF_DATALESS = getattr(stat, "SF_DATALESS", 0x40000000)
+
+
+class FileNotLocalError(OSError):
+    """The file is an online-only placeholder; its content is not on disk."""
+
+
+def _open_local(path: str):
+    if getattr(os.stat(path), "st_flags", 0) & SF_DATALESS:
+        raise FileNotLocalError(errno.EAGAIN, "Online-only file, not downloaded", path)
+    return open(path, "rb")
+
 
 def hash_file_sync(path: str) -> tuple[str, str]:
     """Read file once, feed both hashers, return (xxhash64_hex, sha256_hex)."""
     xx = xxhash.xxh64()
     sha = hashlib.sha256()
-    with open(path, "rb") as f:
+    with _open_local(path) as f:
         while chunk := f.read(CHUNK_SIZE):
             xx.update(chunk)
             sha.update(chunk)
@@ -26,7 +43,7 @@ def hash_file_sync(path: str) -> tuple[str, str]:
 def hash_fast_only_sync(path: str) -> str:
     """Read file once, return xxHash64 hex only. ~10x faster than dual hash."""
     xx = xxhash.xxh64()
-    with open(path, "rb") as f:
+    with _open_local(path) as f:
         while chunk := f.read(CHUNK_SIZE):
             xx.update(chunk)
     return xx.hexdigest()
@@ -46,7 +63,7 @@ def hash_partial_and_fast_sync(path: str) -> tuple[str, str]:
 
     if file_size <= PARTIAL_SIZE * 2:
         # Small file — full read, both hashes are the same
-        with open(path, "rb") as f:
+        with _open_local(path) as f:
             while chunk := f.read(CHUNK_SIZE):
                 xx_fast.update(chunk)
         h = xx_fast.hexdigest()
@@ -56,7 +73,7 @@ def hash_partial_and_fast_sync(path: str) -> tuple[str, str]:
     first_buf = bytearray()
     last_buf = bytearray()
 
-    with open(path, "rb") as f:
+    with _open_local(path) as f:
         while chunk := f.read(CHUNK_SIZE):
             xx_fast.update(chunk)
             if len(first_buf) < PARTIAL_SIZE:
@@ -78,7 +95,7 @@ def hash_file_partial_sync(path: str) -> str:
     """xxHash64 of first 64KB + last 64KB. For files <= 128KB, reads everything."""
     xx = xxhash.xxh64()
     file_size = os.path.getsize(path)
-    with open(path, "rb") as f:
+    with _open_local(path) as f:
         if file_size <= PARTIAL_SIZE * 2:
             while chunk := f.read(CHUNK_SIZE):
                 xx.update(chunk)

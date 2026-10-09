@@ -17,7 +17,7 @@ import time
 from collections import deque
 
 from file_hunter_core.walker import scan_directory
-from file_hunter_core.hasher import hash_file_partial_sync
+from file_hunter_core.hasher import FileNotLocalError, hash_file_partial_sync
 
 _SCAN_BATCH = 200  # entries consumed per thread dispatch from scan_directory
 
@@ -183,7 +183,12 @@ async def _run_scan(path: str, root_path: str):
                             fi["hash_fast"] = None
                             fi["hash_strong"] = None
                         except OSError as e:
-                            logger.warning("Hash failed: %s: %s", fp, e)
+                            log = (
+                                logger.debug
+                                if isinstance(e, FileNotLocalError)
+                                else logger.warning
+                            )
+                            log("Hash failed: %s: %s", fp, e)
                             fi["hash_partial"] = None
                             fi["hash_fast"] = None
                             fi["hash_strong"] = None
